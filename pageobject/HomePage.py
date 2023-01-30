@@ -12,7 +12,6 @@ class HomePage:
     def click_my_account(self):
         elements = self.driver.find_elements(By.CLASS_NAME, self.lnk_myaccount_cl_name)
         for element in elements:
-            print("ELEMENT:", element.text)
             if element.text == "My Account":
                 element.click()
                 break

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>30-01-2023 13-26-28.html</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    let visibleString = getQueryParameter('visible') || 'all';
+    visibleString = visibleString.toLowerCase();
+    const checkedItems = visibleString.split(',');
+
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++) {
+        filterItems[i].hidden = false;
+
+        if (visibleString != 'all') {
+            filterItems[i].checked = checkedItems.includes(filterItems[i].getAttribute('data-test-result'));
+            filterTable(filterItems[i]);
+        }
+    }
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>30-01-2023 13-26-28.html</h1>
+    <p>Report generated on 30-Jan-2023 at 13:27:29 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.2.0</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "pytest": "5.4.3"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.19041-SP0</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.9.1</td></tr></table>
+    <h2>Summary</h2>
+    <p>1 tests ran in 60.25 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">0 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">1 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_account_registration.py::TestAccountRegistration::test_account_registration</td>
+          <td class="col-duration">57.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;tests.test_account_registration.TestAccountRegistration object at 0x000001B7163A12B0&gt;<br/>setup = &lt;selenium.webdriver.chrome.webdriver.WebDriver (session=&quot;5a6cb3c197546ae672845bdc94ad0d92&quot;)&gt;<br/><br/>    @pytest.mark.bat<br/>    def test_account_registration(self, setup):<br/>        self.logger.info(&quot;Getting set up ready for test_account_registration&quot;)<br/>        self.driver = setup<br/>        self.driver.get(self.baseURL)<br/>        self.driver.maximize_window()<br/>    <br/>        self.home_page = HomePage(self.driver)<br/>        self.home_page.click_my_account()<br/>&gt;       self.home_page.click_register()<br/><br/>tests\test_account_registration.py:24: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>pageobject\HomePage.py:21: in click_register<br/>    self.driver.find_element(By.LINK_TEXT, self.lnk_register_linktext).click()<br/>C:\Python\Python39\lib\site-packages\selenium\webdriver\remote\webdriver.py:830: in find_element<br/>    return self.execute(Command.FIND_ELEMENT, {&quot;using&quot;: by, &quot;value&quot;: value})[&quot;value&quot;]<br/>C:\Python\Python39\lib\site-packages\selenium\webdriver\remote\webdriver.py:440: in execute<br/>    self.error_handler.check_response(response)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;selenium.webdriver.remote.errorhandler.ErrorHandler object at 0x000001B7163A1FA0&gt;<br/>response = {&#x27;status&#x27;: 404, &#x27;value&#x27;: &#x27;{&quot;value&quot;:{&quot;error&quot;:&quot;no such element&quot;,&quot;message&quot;:&quot;no such element: Unable to locate element: {\...\n\\tRtlGetAppContainerNamedObjectPath [0x77A97A9E+286]\\n\\tRtlGetAppContainerNamedObjectPath [0x77A97A6E+238]\\n&quot;}}&#x27;}<br/><br/>    def check_response(self, response: Dict[str, Any]) -&gt; None:<br/>        &quot;&quot;&quot;Checks that a JSON response from the WebDriver does not have an<br/>        error.<br/>    <br/>        :Args:<br/>         - response - The JSON response from the WebDriver server as a dictionary<br/>           object.<br/>    <br/>        :Raises: If the response contains an error message.<br/>        &quot;&quot;&quot;<br/>        status = response.get(&quot;status&quot;, None)<br/>        if not status or status == ErrorCode.SUCCESS:<br/>            return<br/>        value = None<br/>        message = response.get(&quot;message&quot;, &quot;&quot;)<br/>        screen: str = response.get(&quot;screen&quot;, &quot;&quot;)<br/>        stacktrace = None<br/>        if isinstance(status, int):<br/>            value_json = response.get(&quot;value&quot;, None)<br/>            if value_json and isinstance(value_json, str):<br/>                import json<br/>    <br/>                try:<br/>                    value = json.loads(value_json)<br/>                    if len(value.keys()) == 1:<br/>                        value = value[&quot;value&quot;]<br/>                    status = value.get(&quot;error&quot;, None)<br/>                    if not status:<br/>                        status = value.get(&quot;status&quot;, ErrorCode.UNKNOWN_ERROR)<br/>                        message = value.get(&quot;value&quot;) or value.get(&quot;message&quot;)<br/>                        if not isinstance(message, str):<br/>                            value = message<br/>                            message = message.get(&quot;message&quot;)<br/>                    else:<br/>                        message = value.get(&quot;message&quot;, None)<br/>                except ValueError:<br/>                    pass<br/>    <br/>        exception_class: Type[WebDriverException]<br/>        if status in ErrorCode.NO_SUCH_ELEMENT:<br/>            exception_class = NoSuchElementException<br/>        elif status in ErrorCode.NO_SUCH_FRAME:<br/>            exception_class = NoSuchFrameException<br/>        elif status in ErrorCode.NO_SUCH_SHADOW_ROOT:<br/>            exception_class = NoSuchShadowRootException<br/>        elif status in ErrorCode.NO_SUCH_WINDOW:<br/>            exception_class = NoSuchWindowException<br/>        elif status in ErrorCode.STALE_ELEMENT_REFERENCE:<br/>            exception_class = StaleElementReferenceException<br/>        elif status in ErrorCode.ELEMENT_NOT_VISIBLE:<br/>            exception_class = ElementNotVisibleException<br/>        elif status in ErrorCode.INVALID_ELEMENT_STATE:<br/>            exception_class = InvalidElementStateException<br/>        elif (<br/>            status in ErrorCode.INVALID_SELECTOR<br/>            or status in ErrorCode.INVALID_XPATH_SELECTOR<br/>            or status in ErrorCode.INVALID_XPATH_SELECTOR_RETURN_TYPER<br/>        ):<br/>            exception_class = InvalidSelectorException<br/>        elif status in ErrorCode.ELEMENT_IS_NOT_SELECTABLE:<br/>            exception_class = ElementNotSelectableException<br/>        elif status in ErrorCode.ELEMENT_NOT_INTERACTABLE:<br/>            exception_class = ElementNotInteractableException<br/>        elif status in ErrorCode.INVALID_COOKIE_DOMAIN:<br/>            exception_class = InvalidCookieDomainException<br/>        elif status in ErrorCode.UNABLE_TO_SET_COOKIE:<br/>            exception_class = UnableToSetCookieException<br/>        elif status in ErrorCode.TIMEOUT:<br/>            exception_class = TimeoutException<br/>        elif status in ErrorCode.SCRIPT_TIMEOUT:<br/>            exception_class = TimeoutException<br/>        elif status in ErrorCode.UNKNOWN_ERROR:<br/>            exception_class = WebDriverException<br/>        elif status in ErrorCode.UNEXPECTED_ALERT_OPEN:<br/>            exception_class = UnexpectedAlertPresentException<br/>        elif status in ErrorCode.NO_ALERT_OPEN:<br/>            exception_class = NoAlertPresentException<br/>        elif status in ErrorCode.IME_NOT_AVAILABLE:<br/>            exception_class = ImeNotAvailableException<br/>        elif status in ErrorCode.IME_ENGINE_ACTIVATION_FAILED:<br/>            exception_class = ImeActivationFailedException<br/>        elif status in ErrorCode.MOVE_TARGET_OUT_OF_BOUNDS:<br/>            exception_class = MoveTargetOutOfBoundsException<br/>        elif status in ErrorCode.JAVASCRIPT_ERROR:<br/>            exception_class = JavascriptException<br/>        elif status in ErrorCode.SESSION_NOT_CREATED:<br/>            exception_class = SessionNotCreatedException<br/>        elif status in ErrorCode.INVALID_ARGUMENT:<br/>            exception_class = InvalidArgumentException<br/>        elif status in ErrorCode.NO_SUCH_COOKIE:<br/>            exception_class = NoSuchCookieException<br/>        elif status in ErrorCode.UNABLE_TO_CAPTURE_SCREEN:<br/>            exception_class = ScreenshotException<br/>        elif status in ErrorCode.ELEMENT_CLICK_INTERCEPTED:<br/>            exception_class = ElementClickInterceptedException<br/>        elif status in ErrorCode.INSECURE_CERTIFICATE:<br/>            exception_class = InsecureCertificateException<br/>        elif status in ErrorCode.INVALID_COORDINATES:<br/>            exception_class = InvalidCoordinatesException<br/>        elif status in ErrorCode.INVALID_SESSION_ID:<br/>            exception_class = InvalidSessionIdException<br/>        elif status in ErrorCode.UNKNOWN_METHOD:<br/>            exception_class = UnknownMethodException<br/>        else:<br/>            exception_class = WebDriverException<br/>        if not value:<br/>            value = response[&quot;value&quot;]<br/>        if isinstance(value, str):<br/>            raise exception_class(value)<br/>        if message == &quot;&quot; and &quot;message&quot; in value:<br/>            message = value[&quot;message&quot;]<br/>    <br/>        screen = None  # type: ignore[assignment]<br/>        if &quot;screen&quot; in value:<br/>            screen = value[&quot;screen&quot;]<br/>    <br/>        stacktrace = None<br/>        st_value = value.get(&quot;stackTrace&quot;) or value.get(&quot;stacktrace&quot;)<br/>        if st_value:<br/>            if isinstance(st_value, str):<br/>                stacktrace = st_value.split(&quot;\n&quot;)<br/>            else:<br/>                stacktrace = []<br/>                try:<br/>                    for frame in st_value:<br/>                        line = frame.get(&quot;lineNumber&quot;, &quot;&quot;)<br/>                        file = frame.get(&quot;fileName&quot;, &quot;&lt;anonymous&gt;&quot;)<br/>                        if line:<br/>                            file = f&quot;{file}:{line}&quot;<br/>                        meth = frame.get(&quot;methodName&quot;, &quot;&lt;anonymous&gt;&quot;)<br/>                        if &quot;className&quot; in frame:<br/>                            meth = f&quot;{frame[&#x27;className&#x27;]}.{meth}&quot;<br/>                        msg = &quot;    at %s (%s)&quot;<br/>                        msg = msg % (meth, file)<br/>                        stacktrace.append(msg)<br/>                except TypeError:<br/>                    pass<br/>        if exception_class == UnexpectedAlertPresentException:<br/>            alert_text = None<br/>            if &quot;data&quot; in value:<br/>                alert_text = value[&quot;data&quot;].get(&quot;text&quot;)<br/>            elif &quot;alert&quot; in value:<br/>                alert_text = value[&quot;alert&quot;].get(&quot;text&quot;)<br/>            raise exception_class(message, screen, stacktrace, alert_text)  # type: ignore[call-arg]  # mypy is not smart enough here<br/>&gt;       raise exception_class(message, screen, stacktrace)<br/><span class="error">E       selenium.common.exceptions.NoSuchElementException: Message: no such element: Unable to locate element: {&quot;method&quot;:&quot;link text&quot;,&quot;selector&quot;:&quot;Register&quot;}</span><br/><span class="error">E         (Session info: chrome=109.0.5414.120)</span><br/><span class="error">E       Stacktrace:</span><br/><span class="error">E       Backtrace:</span><br/><span class="error">E       	(No symbol) [0x00DC6643]</span><br/><span class="error">E       	(No symbol) [0x00D5BE21]</span><br/><span class="error">E       	(No symbol) [0x00C5DA9D]</span><br/><span class="error">E       	(No symbol) [0x00C91342]</span><br/><span class="error">E       	(No symbol) [0x00C9147B]</span><br/><span class="error">E       	(No symbol) [0x00CC8DC2]</span><br/><span class="error">E       	(No symbol) [0x00CAFDC4]</span><br/><span class="error">E       	(No symbol) [0x00CC6B09]</span><br/><span class="error">E       	(No symbol) [0x00CAFB76]</span><br/><span class="error">E       	(No symbol) [0x00C849C1]</span><br/><span class="error">E       	(No symbol) [0x00C85E5D]</span><br/><span class="error">E       	GetHandleVerifier [0x0103A142+2497106]</span><br/><span class="error">E       	GetHandleVerifier [0x010685D3+2686691]</span><br/><span class="error">E       	GetHandleVerifier [0x0106BB9C+2700460]</span><br/><span class="error">E       	GetHandleVerifier [0x00E73B10+635936]</span><br/><span class="error">E       	(No symbol) [0x00D64A1F]</span><br/><span class="error">E       	(No symbol) [0x00D6A418]</span><br/><span class="error">E       	(No symbol) [0x00D6A505]</span><br/><span class="error">E       	(No symbol) [0x00D7508B]</span><br/><span class="error">E       	BaseThreadInitThunk [0x76DEFA29+25]</span><br/><span class="error">E       	RtlGetAppContainerNamedObjectPath [0x77A97A9E+286]</span><br/><span class="error">E       	RtlGetAppContainerNamedObjectPath [0x77A97A6E+238]</span><br/><br/>C:\Python\Python39\lib\site-packages\selenium\webdriver\remote\errorhandler.py:245: NoSuchElementException<br/> -------------------------------Captured log setup------------------------------- <br/>INFO     WDM:logger.py:11 ====== WebDriver manager ======
+INFO     WDM:logger.py:11 Get LATEST chromedriver version for google-chrome 109.0.5414
+DEBUG    urllib3.connectionpool:connectionpool.py:1003 Starting new HTTPS connection (1): chromedriver.storage.googleapis.com:443
+DEBUG    urllib3.connectionpool:connectionpool.py:456 https://chromedriver.storage.googleapis.com:443 &quot;GET /LATEST_RELEASE_109.0.5414 HTTP/1.1&quot; 200 13
+INFO     WDM:logger.py:11 Driver [C:\Users\HP\.wdm\drivers\chromedriver\win32\109.0.5414\chromedriver.exe] found in cache
+DEBUG    selenium.webdriver.common.service:service.py:204 Started executable: `C:\Users\HP\.wdm\drivers\chromedriver\win32\109.0.5414\chromedriver.exe` in a child process with pid: 9048
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 POST http://localhost:50710/session {&quot;capabilities&quot;: {&quot;firstMatch&quot;: [{}], &quot;alwaysMatch&quot;: {&quot;browserName&quot;: &quot;chrome&quot;, &quot;pageLoadStrategy&quot;: &quot;normal&quot;, &quot;goog:chromeOptions&quot;: {&quot;extensions&quot;: [], &quot;args&quot;: []}}}}
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): localhost:50710
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;POST /session HTTP/1.1&quot; 200 786
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:{&quot;capabilities&quot;:{&quot;acceptInsecureCerts&quot;:false,&quot;browserName&quot;:&quot;chrome&quot;,&quot;browserVersion&quot;:&quot;109.0.5414.120&quot;,&quot;chrome&quot;:{&quot;chromedriverVersion&quot;:&quot;109.0.5414.74 (e7c5703604daa9cc128ccf5a5d3e993513758913-refs/branch-heads/5414@{#1172})&quot;,&quot;userDataDir&quot;:&quot;C:\\Users\\HP\\AppData\\Local\\Temp\\scoped_dir9048_96777945&quot;},&quot;goog:chromeOptions&quot;:{&quot;debuggerAddress&quot;:&quot;localhost:50714&quot;},&quot;networkConnectionEnabled&quot;:false,&quot;pageLoadStrategy&quot;:&quot;normal&quot;,&quot;platformName&quot;:&quot;windows&quot;,&quot;proxy&quot;:{},&quot;setWindowRect&quot;:true,&quot;strictFileInteractability&quot;:false,&quot;timeouts&quot;:{&quot;implicit&quot;:0,&quot;pageLoad&quot;:300000,&quot;script&quot;:30000},&quot;unhandledPromptBehavior&quot;:&quot;dismiss and notify&quot;,&quot;webauthn:extension:credBlob&quot;:true,&quot;webauthn:extension:largeBlob&quot;:true,&quot;webauthn:virtualAuthenticators&quot;:true},&quot;sessionId&quot;:&quot;5a6cb3c197546ae672845bdc94ad0d92&quot;}} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;786&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request<br/> ------------------------------Captured stdout call------------------------------ <br/>ELEMENT: Currency
+ELEMENT: 123456789
+ELEMENT: My Account
+<br/> -------------------------------Captured log call-------------------------------- <br/>INFO     root:test_account_registration.py:17 Getting set up ready for test_account_registration
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 POST http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/url {&quot;url&quot;: &quot;https://demo.opencart.com&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;POST /session/5a6cb3c197546ae672845bdc94ad0d92/url HTTP/1.1&quot; 200 14
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:null} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;14&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 POST http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/window/maximize {}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;POST /session/5a6cb3c197546ae672845bdc94ad0d92/window/maximize HTTP/1.1&quot; 200 51
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:{&quot;height&quot;:744,&quot;width&quot;:1382,&quot;x&quot;:-8,&quot;y&quot;:-8}} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;51&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 POST http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/elements {&quot;using&quot;: &quot;css selector&quot;, &quot;value&quot;: &quot;.d-md-inline&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;POST /session/5a6cb3c197546ae672845bdc94ad0d92/elements HTTP/1.1&quot; 200 485
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:[{&quot;element-6066-11e4-a52e-4f735466cecf&quot;:&quot;4af8f809-4144-4ef2-8efb-4ceddd64f1af&quot;},{&quot;element-6066-11e4-a52e-4f735466cecf&quot;:&quot;ae8005e4-f0b8-422a-84c5-a087920e0c2a&quot;},{&quot;element-6066-11e4-a52e-4f735466cecf&quot;:&quot;ddc0a395-76cc-4074-9ed5-d8e253d87ede&quot;},{&quot;element-6066-11e4-a52e-4f735466cecf&quot;:&quot;7fae622a-1f5f-4d65-92db-40a70c407c87&quot;},{&quot;element-6066-11e4-a52e-4f735466cecf&quot;:&quot;380ca4ea-6652-4843-aa60-6297a556dd50&quot;},{&quot;element-6066-11e4-a52e-4f735466cecf&quot;:&quot;c6b2a3f4-1225-4985-9c2d-fdee5a71d31f&quot;}]} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;485&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 GET http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/4af8f809-4144-4ef2-8efb-4ceddd64f1af/text {&quot;id&quot;: &quot;4af8f809-4144-4ef2-8efb-4ceddd64f1af&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;GET /session/5a6cb3c197546ae672845bdc94ad0d92/element/4af8f809-4144-4ef2-8efb-4ceddd64f1af/text HTTP/1.1&quot; 200 20
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:&quot;Currency&quot;} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;20&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 GET http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/4af8f809-4144-4ef2-8efb-4ceddd64f1af/text {&quot;id&quot;: &quot;4af8f809-4144-4ef2-8efb-4ceddd64f1af&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;GET /session/5a6cb3c197546ae672845bdc94ad0d92/element/4af8f809-4144-4ef2-8efb-4ceddd64f1af/text HTTP/1.1&quot; 200 20
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:&quot;Currency&quot;} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;20&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 GET http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/ae8005e4-f0b8-422a-84c5-a087920e0c2a/text {&quot;id&quot;: &quot;ae8005e4-f0b8-422a-84c5-a087920e0c2a&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;GET /session/5a6cb3c197546ae672845bdc94ad0d92/element/ae8005e4-f0b8-422a-84c5-a087920e0c2a/text HTTP/1.1&quot; 200 21
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:&quot;123456789&quot;} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;21&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 GET http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/ae8005e4-f0b8-422a-84c5-a087920e0c2a/text {&quot;id&quot;: &quot;ae8005e4-f0b8-422a-84c5-a087920e0c2a&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;GET /session/5a6cb3c197546ae672845bdc94ad0d92/element/ae8005e4-f0b8-422a-84c5-a087920e0c2a/text HTTP/1.1&quot; 200 21
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:&quot;123456789&quot;} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;21&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 GET http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/ddc0a395-76cc-4074-9ed5-d8e253d87ede/text {&quot;id&quot;: &quot;ddc0a395-76cc-4074-9ed5-d8e253d87ede&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;GET /session/5a6cb3c197546ae672845bdc94ad0d92/element/ddc0a395-76cc-4074-9ed5-d8e253d87ede/text HTTP/1.1&quot; 200 22
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:&quot;My Account&quot;} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;22&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 GET http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/ddc0a395-76cc-4074-9ed5-d8e253d87ede/text {&quot;id&quot;: &quot;ddc0a395-76cc-4074-9ed5-d8e253d87ede&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;GET /session/5a6cb3c197546ae672845bdc94ad0d92/element/ddc0a395-76cc-4074-9ed5-d8e253d87ede/text HTTP/1.1&quot; 200 22
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:&quot;My Account&quot;} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;22&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 POST http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element/ddc0a395-76cc-4074-9ed5-d8e253d87ede/click {&quot;id&quot;: &quot;ddc0a395-76cc-4074-9ed5-d8e253d87ede&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;POST /session/5a6cb3c197546ae672845bdc94ad0d92/element/ddc0a395-76cc-4074-9ed5-d8e253d87ede/click HTTP/1.1&quot; 200 14
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=200 | data={&quot;value&quot;:null} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;14&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:303 POST http://localhost:50710/session/5a6cb3c197546ae672845bdc94ad0d92/element {&quot;using&quot;: &quot;link text&quot;, &quot;value&quot;: &quot;Register&quot;}
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://localhost:50710 &quot;POST /session/5a6cb3c197546ae672845bdc94ad0d92/element HTTP/1.1&quot; 404 948
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:319 Remote response: status=404 | data={&quot;value&quot;:{&quot;error&quot;:&quot;no such element&quot;,&quot;message&quot;:&quot;no such element: Unable to locate element: {\&quot;method\&quot;:\&quot;link text\&quot;,\&quot;selector\&quot;:\&quot;Register\&quot;}\n  (Session info: chrome=109.0.5414.120)&quot;,&quot;stacktrace&quot;:&quot;Backtrace:\n\t(No symbol) [0x00DC6643]\n\t(No symbol) [0x00D5BE21]\n\t(No symbol) [0x00C5DA9D]\n\t(No symbol) [0x00C91342]\n\t(No symbol) [0x00C9147B]\n\t(No symbol) [0x00CC8DC2]\n\t(No symbol) [0x00CAFDC4]\n\t(No symbol) [0x00CC6B09]\n\t(No symbol) [0x00CAFB76]\n\t(No symbol) [0x00C849C1]\n\t(No symbol) [0x00C85E5D]\n\tGetHandleVerifier [0x0103A142+2497106]\n\tGetHandleVerifier [0x010685D3+2686691]\n\tGetHandleVerifier [0x0106BB9C+2700460]\n\tGetHandleVerifier [0x00E73B10+635936]\n\t(No symbol) [0x00D64A1F]\n\t(No symbol) [0x00D6A418]\n\t(No symbol) [0x00D6A505]\n\t(No symbol) [0x00D7508B]\n\tBaseThreadInitThunk [0x76DEFA29+25]\n\tRtlGetAppContainerNamedObjectPath [0x77A97A9E+286]\n\tRtlGetAppContainerNamedObjectPath [0x77A97A6E+238]\n&quot;}} | headers=HTTPHeaderDict({&#x27;Content-Length&#x27;: &#x27;948&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json; charset=utf-8&#x27;, &#x27;cache-control&#x27;: &#x27;no-cache&#x27;})
+DEBUG    selenium.webdriver.remote.remote_connection:remote_connection.py:347 Finished Request<br/></div></td></tr></tbody></table></body></html>

@@ -12,6 +12,7 @@ class TestAccountRegistration:
     baseURL = ReadConfig.get_applications_URL()
     logger = LogGenerator.logger()
 
+    @pytest.mark.bat
     def test_account_registration(self, setup):
         self.logger.info("Getting set up ready for test_account_registration")
         self.driver = setup
@@ -39,4 +40,3 @@ class TestAccountRegistration:
             self.driver.save_screenshot(os.path.abspath(os.curdir)+"\\screenshots\\"+"test_account_registration.png")
             self.driver.close()
             pytest.fail("Account is not created.")
-
